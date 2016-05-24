@@ -22,6 +22,11 @@ public class DataSyncApplicationTests {
   private CronService cronService;
 
   @Test
+  public void testEmpty() {
+    System.out.println("Empty test");
+  }
+
+//  @Test
   public void testMe() {
     algoliaService.importJobs(Env.DEV, false);
   }

@@ -2,14 +2,10 @@ package staging
 
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder
 import ch.qos.logback.core.ConsoleAppender
-import ch.qos.logback.core.rolling.FixedWindowRollingPolicy
 import ch.qos.logback.core.rolling.RollingFileAppender
-import ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy
-import ch.qos.logback.core.rolling.TimeBasedRollingPolicy
+import ch.qos.logback.core.util.FileSize
 
-import java.text.SimpleDateFormat
-
-import static ch.qos.logback.classic.Level.*
+import static ch.qos.logback.classic.Level.DEBUG
 
 scan()
 
@@ -19,9 +15,11 @@ new File(LOG_FOLDER).mkdirs()
 
 appender("FILE", RollingFileAppender) {
   file = "${LOG_FOLDER}dtool.log"
-  rollingPolicy(TimeBasedRollingPolicy) {
-    fileNamePattern = "${LOG_FOLDER}dtool-%d{yyyyMMdd}.log"
-    maxHistory = 30
+  rollingPolicy(SizeAndTimeBasedRollingPolicy) {
+    fileNamePattern = "${LOG_FOLDER}dtool-%d{yyyyMMdd}.%i.log"
+    maxHistory = 10
+    maxFileSize = "10mb"
+    totalSizeCap = FileSize.valueOf("1gb")
   }
   encoder(PatternLayoutEncoder) {
     pattern = "%d{HH:mm:ss.SSS} %p [%t] %c{1}: %m%n"
@@ -30,9 +28,11 @@ appender("FILE", RollingFileAppender) {
 
 appender("DEBUG", RollingFileAppender) {
   file = "${LOG_FOLDER}dtool-debug.log"
-  rollingPolicy(TimeBasedRollingPolicy) {
-    fileNamePattern = "${LOG_FOLDER}dtool-debug-%d{yyyyMMdd}.log"
-    maxHistory = 30
+  rollingPolicy(SizeAndTimeBasedRollingPolicy) {
+    fileNamePattern = "${LOG_FOLDER}dtool-debug-%d{yyyyMMdd}.%i.log"
+    maxHistory = 10
+    maxFileSize = "10mb"
+    totalSizeCap = FileSize.valueOf("1gb")
   }
   encoder(PatternLayoutEncoder) {
     pattern = "%d{HH:mm:ss.SSS} %p [%t] %c{1}: %m%n"
@@ -47,5 +47,5 @@ appender("CONSOLE", ConsoleAppender) {
 
 logger("com.vnw.data.service", DEBUG, ["CONSOLE", "DEBUG"])
 
-root(ERROR, ["CONSOLE", "FILE"])
+root(DEBUG, ["CONSOLE", "FILE"])
 

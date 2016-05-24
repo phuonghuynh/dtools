@@ -63,7 +63,8 @@ public class AlgoliaServiceImpl implements AlgoliaService {
       .from(com.vnw.data.jooq.tables.Tbljob.TBLJOB);
   }
 
-  public PageSeek jobPageSeek(Env env) {
+  //TODO support threads
+  private PageSeek jobPageSeek(Env env) {
     return new PageSeek()
       .setMinId(
         env.getDsl()
@@ -85,8 +86,7 @@ public class AlgoliaServiceImpl implements AlgoliaService {
       );
   }
 
-  public int importJobs(Env env, boolean onlyLastJobs) {
-    int count = 0;
+  private SelectSeekStep1<Record10<Integer, Integer, String, String, String, String, Integer, Integer, Timestamp, Byte>, Integer> selectImportJobs(Env env, boolean onlyLastJobs) {
     SelectConditionStep<Record10<Integer, Integer, String, String, String, String, Integer, Integer, Timestamp, Byte>> selectWhere = selectJobs(env)
       .where(activeJobCondition()
         .and(com.vnw.data.jooq.tables.Tbljob.TBLJOB.EXPIREDDATE.ge(new Timestamp(new Date().getTime())))
@@ -99,21 +99,27 @@ public class AlgoliaServiceImpl implements AlgoliaService {
         );
     }
 
-    SelectSeekStep1<Record10<Integer, Integer, String, String, String, String, Integer, Integer, Timestamp, Byte>, Integer> select = selectWhere.orderBy(com.vnw.data.jooq.tables.Tbljob.TBLJOB.JOBID.asc());
+    return selectWhere.orderBy(com.vnw.data.jooq.tables.Tbljob.TBLJOB.JOBID.asc());
+  }
 
-    log.debug("SQL generate: {}", select.getSQL());
+  public int importJobs(Env env, boolean onlyLastJobs) {
+    log.debug("{}", onlyLastJobs ? "Going to update new jobs" : "Import all jobs");
 
+    int count = 0;
     Integer lastJobId = null;
     while (true) {
-      List<Tbljob> jobs = lastJobId == null || lastJobId == 0 ?
+      SelectSeekStep1<Record10<Integer, Integer, String, String, String, String, Integer, Integer, Timestamp, Byte>, Integer> select = selectImportJobs(env, onlyLastJobs);
+      List<Tbljob> jobs = lastJobId == null ?
         select.limit(limit).fetchInto(Tbljob.class) :
         select.seek(lastJobId).limit(limit).fetchInto(Tbljob.class);
+      log.debug("SQL generated :\n {}", select.toString());
       if (jobs.size() == 0) {
         break;
       }
 
       List<AlgoliaJob> algoliaJobs = jobs.stream().map(job -> algoliaJobMapper.from(env, job)).collect(Collectors.toList());
-      lastJobId = jobs.stream().reduce((a, b) -> b).orElse(new Tbljob()).getJobid();
+      lastJobId = jobs.get(jobs.size() - 1).getJobid();
+
       JSONArray comingJobs = new JSONArray(algoliaJobs);
 
       try {
@@ -154,7 +160,7 @@ public class AlgoliaServiceImpl implements AlgoliaService {
   }
 
   public void deleteDeprecatedJobs(Env env) {
-    Set<Integer> deprecatedJobIds = env.getDsl()
+    List<String> deprecatedJobIds = env.getDsl()
       .select(com.vnw.data.jooq.tables.Tbljob.TBLJOB.JOBID)
       .from(com.vnw.data.jooq.tables.Tbljob.TBLJOB)
       .where(expiredDateFromYesterdayCondition())
@@ -162,7 +168,14 @@ public class AlgoliaServiceImpl implements AlgoliaService {
         .andNot(activeJobCondition())
       )
       .fetchInto(Tbljob.class)
-      .stream().map(j -> j.getJobid()).collect(Collectors.toSet());
-    System.out.println(deprecatedJobIds);
+      .stream().map(j -> j.getJobid() + "").collect(Collectors.toList());
+    log.debug("Going to delete deprecated-job-ids: {}", deprecatedJobIds);
+    try {
+      JSONObject objs = env.getAlgoliaIndex().deleteObjects(deprecatedJobIds);
+      System.out.println(objs);
+    }
+    catch (AlgoliaException e) {
+      log.debug("Failed delete Algolia Jobs: {}", e);
+    }
   }
 }
