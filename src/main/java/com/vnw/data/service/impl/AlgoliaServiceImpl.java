@@ -11,6 +11,7 @@ import com.vnw.data.model.PageSeek;
 import com.vnw.data.service.AlgoliaService;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Condition;
+import org.jooq.Record1;
 import org.jooq.Record10;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectJoinStep;
@@ -160,19 +161,23 @@ public class AlgoliaServiceImpl implements AlgoliaService {
   }
 
   public void deleteDeprecatedJobs(Env env) {
-    List<String> deprecatedJobIds = env.getDsl()
+    SelectConditionStep<Record1<Integer>> select = env.getDsl()
       .select(com.vnw.data.jooq.tables.Tbljob.TBLJOB.JOBID)
       .from(com.vnw.data.jooq.tables.Tbljob.TBLJOB)
       .where(expiredDateFromYesterdayCondition())
       .or(timestampFromLastTimeInMinsCondition(com.vnw.data.jooq.tables.Tbljob.TBLJOB.LASTUPDATEDDATE, lastMins)
         .andNot(activeJobCondition())
-      )
+      );
+    log.debug("Deprecated job sql: \n{}", select.toString());
+
+    List<String> deprecatedJobIds = select
       .fetchInto(Tbljob.class)
       .stream().map(j -> j.getJobid() + "").collect(Collectors.toList());
-    log.debug("Going to delete deprecated-job-ids: {}", deprecatedJobIds);
+    log.debug("Going to delete {} deprecated-job-ids: {}", deprecatedJobIds.size(), deprecatedJobIds);
     try {
       JSONObject objs = env.getAlgoliaIndex().deleteObjects(deprecatedJobIds);
-      System.out.println(objs);
+      JSONArray objectIDs = objs.getJSONArray("objectIDs");
+      log.debug("Deleted {} object-ids: {}", objectIDs.length(), objectIDs);
     }
     catch (AlgoliaException e) {
       log.debug("Failed delete Algolia Jobs: {}", e);

@@ -7,4 +7,5 @@ public interface CronService {
 
   void importLastJobs2Algolia();
 
+  int updateLastJobs();
 }

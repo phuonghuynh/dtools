@@ -21,9 +21,13 @@ public class CronServiceImpl implements CronService {
   @Value("${vnw.env}")
   private Env env;
 
-//  @Scheduled(cron = "${vnw.algolia.import.lastJob.cron}")
+  @Scheduled(cron = "${vnw.algolia.import.lastJob.cron}")
   public void importLastJobs2Algolia() {
+    updateLastJobs();
+  }
+
+  public int updateLastJobs() {
     algoliaService.deleteDeprecatedJobs(env);
-    algoliaService.importJobs(env, true);
+    return algoliaService.importJobs(env, true);
   }
 }

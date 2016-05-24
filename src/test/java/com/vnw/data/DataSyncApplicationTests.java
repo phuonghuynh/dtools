@@ -28,7 +28,8 @@ public class DataSyncApplicationTests {
 
 //  @Test
   public void testMe() {
-    algoliaService.importJobs(Env.DEV, false);
+    algoliaService.deleteDeprecatedJobs(Env.PRODUCTION);
+    algoliaService.importJobs(Env.PRODUCTION, true);
   }
 
 }
